@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俄羅斯方塊</title>
+    <style>
+        body {
+            margin: 0;
+            background: #18202b;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        h1 { margin-bottom: 8px; }
+
+        .game {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+        }
+
+        canvas {
+            background: #10151c;
+            border: 4px solid #526477;
+            box-shadow: 0 0 20px #000;
+        }
+
+        .panel {
+            width: 150px;
+            text-align: left;
+        }
+
+        .panel p {
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        button {
+            width: 150px;
+            margin: 5px 0;
+            padding: 10px;
+            border: 0;
+            border-radius: 5px;
+            background: #38a3ff;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover { background: #167dcc; }
+
+        .help {
+            margin-top: 15px;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .game { gap: 8px; }
+            canvas { width: 250px; height: 500px; }
+            .panel { width: 120px; }
+            button { width: 120px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>俄羅斯方塊</h1>
+
+    <div class="game">
+        <canvas id="board" width="300" height="600"></canvas>
+
+        <div class="panel">
+            <p>分數：<span id="score">0</span></p>
+            <p>消除：<span id="lines">0</span></p>
+            <p>等級：<span id="level">1</span></p>
+
+            <button id="start">開始遊戲</button>
+            <button id="pause">暫停</button>
+
+            <div class="help">
+                ← →：移動<br>
+                ↑：旋轉<br>
+                ↓：加速下降<br>
+                空白鍵：直接落下<br>
+                P：暫停
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("board");
+        const ctx = canvas.getContext("2d");
+
+        const COLS = 10;
+        const ROWS = 20;
+        const SIZE = 30;
+
+        const colors = [
+            null,
+            "#00e5ff", // I
+            "#2962ff", // J
+            "#ff8f00", // L
+            "#ffee00", // O
+            "#00e676", // S
+            "#aa00ff", // T
+            "#ff1744"  // Z
+        ];
+
+        const shapes = [
+            [[1, 1, 1, 1]],
+            [[2, 0, 0], [2, 2, 2]],
+            [[0, 0, 3], [3, 3, 3]],
+            [[4, 4], [4, 4]],
+            [[0, 5, 5], [5, 5, 0]],
+            [[0, 6, 0], [6, 6, 6]],
+            [[7, 7, 0], [0, 7, 7]]
+        ];
+
+        let board;
+        let player;
+        let score = 0;
+        let lines = 0;
+        let level = 1;
+        let running = false;
+        let paused = false;
+        let dropCounter = 0;
+        let lastTime = 0;
+        let dropInterval = 800;
+        let audioContext;
+
+        function newBoard() {
+            return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        }
+
+        function randomPiece() {
+            const matrix = shapes[Math.floor(Math.random() * shapes.length)]
+                .map(row => [...row]);
+
+            return {
+                matrix,
+                x: Math.floor(COLS / 2) - Math.ceil(matrix[0].length / 2),
+                y: 0
+            };
+        }
+
+        function drawCell(x, y, value, alpha = 1) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = colors[value];
+            ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
+
+            ctx.strokeStyle = "#17202a";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x * SIZE, y * SIZE, SIZE, SIZE);
+
+            ctx.globalAlpha = 1;
+        }
+
+        function draw() {
+            ctx.fillStyle = "#10151c";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            board.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) drawCell(x, y, value);
+                });
+            });
+
+            if (player) {
+                player.matrix.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) drawCell(player.x + x, player.y + y, value);
+                    });
+                });
+
+                drawGhost();
+            }
+        }
+
+        function drawGhost() {
+            const oldY = player.y;
+
+            while (!collides()) player.y++;
+            player.y--;
+
+            player.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        drawCell(player.x + x, player.y + y, value, 0.2);
+                    }
+                });
+            });
+
+            player.y = oldY;
+        }
+
+        function collides() {
+            for (let y = 0; y < player.matrix.length; y++) {
+                for (let x = 0; x < player.matrix[y].length; x++) {
+                    if (
+                        player.matrix[y][x] &&
+                        (board[player.y + y] === undefined ||
+                        board[player.y + y][player.x + x] === undefined ||
+                        board[player.y + y][player.x + x])
+                    ) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function merge() {
+            player.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) board[player.y + y][player.x + x] = value;
+                });
+            });
+        }
+
+        function rotateMatrix(matrix) {
+            return matrix[0].map((_, index) =>
+                matrix.map(row => row[index]).reverse()
+            );
+        }
+
+        function rotate() {
+            const oldMatrix = player.matrix;
+            const oldX = player.x;
+
+            player.matrix = rotateMatrix(player.matrix);
+
+            let offset = 1;
+            while (collides()) {
+                player.x += offset;
+                offset = -(offset + (offset > 0 ? 1 : -1));
+
+                if (offset > player.matrix[0].length) {
+                    player.matrix = oldMatrix;
+                    player.x = oldX;
+                    return;
+                }
+            }
+
+            sound(500, 0.05);
+            draw();
+        }
+
+        function move(direction) {
+            player.x += direction;
+
+            if (collides()) player.x -= direction;
+            else sound(250, 0.03);
+
+            draw();
+        }
+
+        function drop() {
+            player.y++;
+
+            if (collides()) {
+                player.y--;
+                merge();
+                clearLines();
+                player = randomPiece();
+
+                if (collides()) {
+                    running = false;
+                    sound(100, 0.5);
+                    alert("遊戲結束！分數：" + score);
+                }
+            }
+
+            dropCounter = 0;
+            draw();
+        }
+
+        function hardDrop() {
+            while (!collides()) player.y++;
+            player.y--;
+            sound(700, 0.08);
+            drop();
+        }
+
+        function clearLines() {
+            let count = 0;
+
+            outer:
+            for (let y = ROWS - 1; y >= 0; y--) {
+                for (let x = 0; x < COLS; x++) {
+                    if (!board[y][x]) continue outer;
+                }
+
+                board.splice(y, 1);
+                board.unshift(Array(COLS).fill(0));
+                y++;
+                count++;
+            }
+
+            if (count) {
+                score += [0, 100, 300, 500, 800][count] * level;
+                lines += count;
+                level = Math.floor(lines / 10) + 1;
+                dropInterval = Math.max(100, 800 - (level - 1) * 70);
+
+                updateInfo();
+                sound(800, 0.2);
+            }
+        }
+
+        function updateInfo() {
+            document.getElementById("score").textContent = score;
+            document.getElementById("lines").textContent = lines;
+            document.getElementById("level").textContent = level;
+        }
+
+        function startGame() {
+            board = newBoard();
+            player = randomPiece();
+            score = 0;
+            lines = 0;
+            level = 1;
+            dropInterval = 800;
+            running = true;
+            paused = false;
+            updateInfo();
+            startAudio();
+            draw();
+        }
+
+        function togglePause() {
+            if (!running) return;
+            paused = !paused;
+            document.getElementById("pause").textContent =
+                paused ? "繼續" : "暫停";
+        }
+
+        function sound(frequency, duration) {
+            if (!audioContext) return;
+
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            oscillator.frequency.value = frequency;
+            oscillator.type = "square";
+            gain.gain.setValueAtTime(0.08, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(
+                0.001,
+                audioContext.currentTime + duration
+            );
+
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function startAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext ||
+                    window.webkitAudioContext)();
+            }
+
+            if (audioContext.state === "suspended") {
+                audioContext.resume();
+            }
+        }
+
+        function update(time = 0) {
+            const delta = time - lastTime;
+            lastTime = time;
+
+            if (running && !paused) {
+                dropCounter += delta;
+                if (dropCounter > dropInterval) drop();
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        document.addEventListener("keydown", event => {
+            if (!running) return;
+
+            if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "]
+                .includes(event.key)) {
+                event.preventDefault();
+            }
+
+            if (event.key === "ArrowLeft") move(-1);
+            if (event.key === "ArrowRight") move(1);
+            if (event.key === "ArrowDown") drop();
+            if (event.key === "ArrowUp") rotate();
+            if (event.key === " ") hardDrop();
+            if (event.key.toLowerCase() === "p") togglePause();
+        });
+
+        document.getElementById("start").addEventListener("click", startGame);
+        document.getElementById("pause").addEventListener("click", togglePause);
+
+        board = newBoard();
+        draw();
+        update();
+    </script>
+</body>
+</html>

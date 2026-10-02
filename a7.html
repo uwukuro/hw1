@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10151c">
+    <title>彩虹彈珠俱樂部 | 打磚塊</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color-scheme: dark;
+            --ink: #f6f5ee;
+            --muted: #a8abb4;
+            --lime: #d2ff55;
+            --line: #ffffff25;
+            --display: "Barlow Condensed", "Noto Sans TC", sans-serif;
+            --body: "Noto Sans TC", sans-serif;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--ink);
+            background: #10151c;
+            font-family: var(--body);
+        }
+        .page {
+            width: min(1120px, 100% - 48px);
+            min-height: 100vh;
+            margin: 0 auto;
+            padding: 24px 0 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+        .brand { display: flex; align-items: center; gap: 11px; font-size: 13px; font-weight: 700; letter-spacing: 0; }
+        .brand-mark { display: grid; width: 30px; aspect-ratio: 1; place-items: center; color: #10151c; background: var(--lime); font: 800 17px var(--display); transform: rotate(-8deg); }
+        .edition { color: var(--muted); font: 600 12px var(--display); letter-spacing: 0; text-transform: uppercase; }
+        .intro { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 25px 0 17px; }
+        h1 { margin: 0; font: 800 clamp(34px, 6vw, 58px)/.92 var(--display); letter-spacing: 0; }
+        h1 span { color: var(--lime); }
+        .intro-note { max-width: 210px; margin: 0 0 2px; color: var(--muted); font-size: 12px; line-height: 1.8; text-align: right; }
+        .cabinet { position: relative; isolation: isolate; overflow: clip; border: 1px solid #ffffff26; background: #161d26; box-shadow: 0 18px 55px #0008, inset 0 1px #ffffff12; }
+        .cabinet::before, .cabinet::after { position: absolute; z-index: -1; width: 200px; aspect-ratio: 1; border: 1px solid #ffffff0b; border-radius: 50%; content: ""; pointer-events: none; }
+        .cabinet::before { top: -140px; left: -70px; box-shadow: 0 0 0 24px #ffffff05, 0 0 0 48px #ffffff04; }
+        .cabinet::after { right: -130px; bottom: -160px; box-shadow: 0 0 0 24px #ffffff05, 0 0 0 48px #ffffff04; }
+        .hud { display: grid; grid-template-columns: repeat(3, 1fr) auto; align-items: center; min-height: 73px; padding: 0 22px; border-bottom: 1px solid var(--line); }
+        .stat { display: grid; gap: 1px; }
+        .stat-label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0; }
+        .stat-value { font: 700 24px/.95 var(--display); font-variant-numeric: tabular-nums; }
+        .stat-value.score { color: var(--lime); }
+        .sound-button { display: grid; width: 38px; aspect-ratio: 1; place-items: center; padding: 0; border: 1px solid var(--line); color: var(--ink); background: #ffffff08; cursor: pointer; }
+        .sound-button:hover { border-color: var(--lime); color: var(--lime); }
+        .sound-button svg { width: 17px; height: 17px; }
+        .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 290px; overflow: hidden; touch-action: none; }
+        .stage canvas { display: block; width: 100%; height: 100%; }
+        .overlay { position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 20px; background: #10151cc9; text-align: center; backdrop-filter: blur(5px); }
+        .overlay[hidden] { display: none; }
+        .overlay-kicker { color: var(--lime); font: 700 13px var(--display); letter-spacing: 0; text-transform: uppercase; }
+        .overlay h2 { margin: 0; font: 800 clamp(32px, 7vw, 54px)/.96 var(--display); letter-spacing: 0; }
+        .overlay p { margin: 0; color: #c0c4ca; font-size: 13px; line-height: 1.8; }
+        .play-button { min-height: 44px; margin-top: 3px; padding: 0 23px; border: 0; color: #10151c; background: var(--lime); font: 800 14px var(--body); cursor: pointer; transition: transform .16s ease, background .16s ease; }
+        .play-button:hover { transform: translateY(-2px); background: #e3ff91; }
+        .controls { display: flex; justify-content: space-between; gap: 18px; padding: 13px 19px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+        .controls strong { color: var(--ink); font-weight: 500; }
+        .auto-control { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); white-space: nowrap; cursor: pointer; }
+        .auto-toggle { appearance: none; position: relative; width: 30px; height: 17px; margin: 0; border: 1px solid #ffffff55; border-radius: 999px; background: #ffffff12; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+        .auto-toggle::before { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #a8abb4; content: ""; transition: transform .16s ease, background .16s ease; }
+        .auto-toggle:checked { border-color: var(--lime); background: #d2ff5533; }
+        .auto-toggle:checked::before { transform: translateX(13px); background: var(--lime); }
+        .auto-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+        .footer { display: flex; justify-content: space-between; gap: 16px; margin-top: auto; padding-top: 17px; color: #858a93; font: 600 11px var(--display); letter-spacing: 0; }
+        @media (min-height: 760px) { .page { padding-top: 30px; padding-bottom: 25px; } }
+        @media (max-width: 620px) {
+            .page { width: calc(100% - 28px); padding-top: 15px; }
+            .topline { padding-bottom: 15px; }
+            .intro { padding: 21px 0 14px; }
+            .intro-note { max-width: 145px; font-size: 10px; }
+            .hud { min-height: 62px; padding: 0 12px; }
+            .stat-label { font-size: 9px; }
+            .stat-value { font-size: 21px; }
+            .stage { min-height: 235px; aspect-ratio: 4 / 3; }
+            .controls { flex-wrap: wrap; row-gap: 10px; padding: 11px 12px; font-size: 10px; }
+        }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true">7</span><span>彩虹彈珠俱樂部</span></div>
+            <span class="edition">ARCADE / NO. 07</span>
+        </header>
+        <section class="intro" aria-labelledby="page-title">
+            <h1 id="page-title">彩虹<span>彈珠</span></h1>
+            <p class="intro-note">瞄準、反彈、清空全場。<br>每一塊磚，都有自己的顏色。</p>
+        </section>
+        <section class="cabinet" aria-label="打磚塊遊戲">
+            <div class="hud" aria-live="polite">
+                <div class="stat"><span class="stat-label">分數 SCORE</span><span class="stat-value score" id="score">0000</span></div>
+                <div class="stat"><span class="stat-label">關卡 LEVEL</span><span class="stat-value" id="level">01</span></div>
+                <div class="stat"><span class="stat-label">生命 LIVES</span><span class="stat-value" id="lives">03</span></div>
+                <button class="sound-button" id="sound-toggle" type="button" aria-label="關閉音效" title="切換音效">
+                    <svg id="sound-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+                </button>
+            </div>
+            <div class="stage" id="stage">
+                <div class="overlay" id="overlay">
+                    <span class="overlay-kicker" id="overlay-kicker">READY PLAYER ONE</span>
+                    <h2 id="overlay-title">準備開打？</h2>
+                    <p id="overlay-copy">移動擋板，讓彈珠留在場上。<br>別讓繽紛的機會溜走。</p>
+                    <button class="play-button" id="play-button" type="button">開始遊戲</button>
+                </div>
+            </div>
+            <div class="controls"><span><strong>← →</strong> 移動擋板</span><span><strong>滑鼠 / 觸控</strong> 直接控制</span><span><strong>空白鍵</strong> 暫停</span><label class="auto-control"><input class="auto-toggle" id="auto-mode" type="checkbox"><span>自動接球</span></label></div>
+        </section>
+        <footer class="footer"><span>KEEP THE BALL IN PLAY</span><span>ONE MORE ROUND?</span></footer>
+    </main>
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js';
+
+        const stage = document.getElementById('stage');
+        const overlay = document.getElementById('overlay');
+        const playButton = document.getElementById('play-button');
+        const scoreDisplay = document.getElementById('score');
+        const levelDisplay = document.getElementById('level');
+        const livesDisplay = document.getElementById('lives');
+        const soundButton = document.getElementById('sound-toggle');
+        const soundIcon = document.getElementById('sound-icon');
+        const autoToggle = document.getElementById('auto-mode');
+        const width = 16;
+        const height = 9;
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.05;
+        stage.prepend(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        const cameraAngle = 0;
+        const camera = new THREE.PerspectiveCamera(30, 1, .1, 60);
+        camera.lookAt(0, 0, 0);
+        scene.add(new THREE.HemisphereLight(0xe5f2ff, 0x38234f, 1.35));
+        const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+        keyLight.position.set(-4, 7, 10);
+        scene.add(keyLight);
+
+        const edgeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x7584a0, emissiveIntensity: .34, metalness: .3, roughness: .45 });
+        const boardEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(width, height, .14)), new THREE.LineBasicMaterial({ color: 0x566578, transparent: true, opacity: .8 }));
+        boardEdges.position.z = -.23;
+        scene.add(boardEdges);
+
+        const paddleMaterial = new THREE.MeshStandardMaterial({ color: 0xd2ff55, emissive: 0x6b9718, emissiveIntensity: .65, metalness: .25, roughness: .23 });
+        const paddle = new THREE.Mesh(new THREE.BoxGeometry(2.25, .23, .8), paddleMaterial);
+        paddle.position.set(0, -3.72, .25);
+        scene.add(paddle);
+        const paddleLine = new THREE.Mesh(new THREE.BoxGeometry(1.66, .035, .02), new THREE.MeshBasicMaterial({ color: 0xf5ffd5 }));
+        paddleLine.position.set(0, .03, .25);
+        paddle.add(paddleLine);
+
+        const ballMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x8afcff, emissiveIntensity: 1.3, metalness: .15, roughness: .15 });
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(.16, 24, 16), ballMaterial);
+        ball.position.set(0, -2.9, .4);
+        scene.add(ball);
+        const ballLight = new THREE.PointLight(0x8afcff, 7, 2.5);
+        ball.add(ballLight);
+
+        const starPositions = new Float32Array(180 * 3);
+        for (let i = 0; i < 180; i++) {
+            starPositions[i * 3] = (Math.random() - .5) * width;
+            starPositions[i * 3 + 1] = (Math.random() - .5) * height;
+            starPositions[i * 3 + 2] = -1.4;
+        }
+        const starGeometry = new THREE.BufferGeometry();
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xf5e7ff, size: .025, transparent: true, opacity: .7 }));
+        scene.add(stars);
+
+        let audioContext = null;
+        let soundEnabled = true;
+        let running = false;
+        let paused = false;
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let ballVelocity = new THREE.Vector2(4.7, 6.3);
+        let pointerX = null;
+        let autoControl = false;
+        let lastFrame = performance.now();
+        let particles = [];
+        let bricks = [];
+        const keys = new Set();
+        const brickColors = [0xe97582, 0xe59a5b, 0xd9bc5a, 0x8fb96a, 0x54b7a0, 0x58a5c5, 0x8979bd];
+
+        function resize() {
+            const bounds = stage.getBoundingClientRect();
+            const ratio = bounds.width / Math.max(bounds.height, 1);
+            const viewHeight = width / ratio;
+            const distance = viewHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.16;
+            camera.aspect = ratio;
+            camera.position.set(0, distance * Math.sin(cameraAngle), distance * Math.cos(cameraAngle));
+            camera.lookAt(0, 0, 0);
+            camera.updateProjectionMatrix();
+            renderer.setSize(bounds.width, bounds.height, false);
+        }
+        new ResizeObserver(resize).observe(stage);
+        resize();
+
+        function tone(frequency, duration = .09, type = 'sine', volume = .045, endFrequency = frequency) {
+            if (!soundEnabled || !audioContext) return;
+            const now = audioContext.currentTime;
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, now);
+            oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), now + duration);
+            gain.gain.setValueAtTime(volume, now);
+            gain.gain.exponentialRampToValueAtTime(.001, now + duration);
+            oscillator.connect(gain).connect(audioContext.destination);
+            oscillator.start(now);
+            oscillator.stop(now + duration);
+        }
+
+        function updateHud() {
+            scoreDisplay.textContent = String(score).padStart(4, '0');
+            levelDisplay.textContent = String(level).padStart(2, '0');
+            livesDisplay.textContent = String(lives).padStart(2, '0');
+        }
+
+        function makeBricks() {
+            for (const brick of bricks) {
+                scene.remove(brick.mesh);
+                brick.mesh.geometry.dispose();
+                brick.mesh.material.forEach(material => material.dispose());
+            }
+            bricks = [];
+            const columns = 8;
+            const rows = Math.min(4 + level, 6);
+            const brickWidth = 1.72;
+            const brickHeight = .36;
+            for (let row = 0; row < rows; row++) {
+                for (let column = 0; column < columns; column++) {
+                    const color = brickColors[(column + row * 2 + level - 1) % brickColors.length];
+                    const baseColor = new THREE.Color(color);
+                    const frontMaterial = new THREE.MeshStandardMaterial({ color: baseColor, emissive: baseColor, emissiveIntensity: .24, metalness: .25, roughness: .24 });
+                    const sideMaterial = new THREE.MeshStandardMaterial({ color: baseColor.clone().multiplyScalar(.38), emissive: baseColor.clone().multiplyScalar(.07), metalness: .25, roughness: .28 });
+                    const shape = new THREE.Shape();
+                    const halfWidth = brickWidth / 2;
+                    const halfHeight = brickHeight / 2;
+                    const radius = .05;
+                    shape.moveTo(-halfWidth + radius, -halfHeight);
+                    shape.lineTo(halfWidth - radius, -halfHeight);
+                    shape.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + radius);
+                    shape.lineTo(halfWidth, halfHeight - radius);
+                    shape.quadraticCurveTo(halfWidth, halfHeight, halfWidth - radius, halfHeight);
+                    shape.lineTo(-halfWidth + radius, halfHeight);
+                    shape.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - radius);
+                    shape.lineTo(-halfWidth, -halfHeight + radius);
+                    shape.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + radius, -halfHeight);
+                    const geometry = new THREE.ExtrudeGeometry(shape, { depth: .5, bevelEnabled: true, bevelSegments: 2, bevelSize: .065, bevelThickness: .08, curveSegments: 3 });
+                    const materials = [frontMaterial, sideMaterial];
+                    const mesh = new THREE.Mesh(geometry, materials);
+                    mesh.position.set((column - (columns - 1) / 2) * 1.94, 3.15 - row * .52, 0);
+                    scene.add(mesh);
+                    bricks.push({ mesh, color, halfWidth: brickWidth / 2, halfHeight: brickHeight / 2 });
+                }
+            }
+        }
+
+        function burst(position, color) {
+            const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 });
+            for (let i = 0; i < 16; i++) {
+                const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(.06 + Math.random() * .055, 0), material.clone());
+                mesh.position.copy(position);
+                scene.add(mesh);
+                particles.push({ mesh, velocity: new THREE.Vector3((Math.random() - .5) * 6, (Math.random() - .5) * 6, (Math.random() - .5) * 2), life: .5 + Math.random() * .3 });
+            }
+            material.dispose();
+        }
+
+        function resetBall() {
+            ball.position.set(paddle.position.x, -2.9, .4);
+            const direction = Math.random() < .5 ? -1 : 1;
+            ballVelocity.set(direction * (3.3 + Math.random()), 6.2 + level * .25);
+        }
+
+        function startGame() {
+            audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') audioContext.resume();
+            score = 0;
+            lives = 3;
+            level = 1;
+            paddle.position.x = 0;
+            pointerX = null;
+            makeBricks();
+            resetBall();
+            updateHud();
+            running = true;
+            paused = false;
+            overlay.hidden = true;
+        }
+
+        function showOverlay(kicker, title, copy, buttonText) {
+            document.getElementById('overlay-kicker').textContent = kicker;
+            document.getElementById('overlay-title').textContent = title;
+            document.getElementById('overlay-copy').innerHTML = copy;
+            playButton.textContent = buttonText;
+            overlay.hidden = false;
+        }
+
+        function hitBrick(brick, dx, dy) {
+            const closestX = Math.max(-brick.halfWidth, Math.min(brick.halfWidth, dx));
+            const closestY = Math.max(-brick.halfHeight, Math.min(brick.halfHeight, dy));
+            const offsetX = dx - closestX;
+            const offsetY = dy - closestY;
+            if (offsetX * offsetX + offsetY * offsetY > .16 * .16) return false;
+            const overlapX = brick.halfWidth + .16 - Math.abs(dx);
+            const overlapY = brick.halfHeight + .16 - Math.abs(dy);
+            if (overlapX < overlapY) ballVelocity.x *= -1;
+            else ballVelocity.y *= -1;
+            return true;
+        }
+
+        function update(delta) {
+            if (!running || paused) return;
+            if (autoControl) {
+                let targetX = ball.position.x;
+                if (ballVelocity.y < 0) {
+                    const targetY = paddle.position.y + .29;
+                    const timeToPaddle = Math.max(0, (ball.position.y - targetY) / -ballVelocity.y);
+                    const wallLimit = 7.75;
+                    const wallSpan = wallLimit * 2;
+                    let foldedX = (ball.position.x + ballVelocity.x * timeToPaddle + wallLimit) % (wallSpan * 2);
+                    if (foldedX < 0) foldedX += wallSpan * 2;
+                    targetX = foldedX <= wallSpan ? foldedX - wallLimit : wallLimit * 3 - foldedX;
+                    if (bricks.length) {
+                        const targetBrick = bricks.reduce((closest, brick) => Math.abs(brick.mesh.position.x - targetX) < Math.abs(closest.mesh.position.x - targetX) ? brick : closest);
+                        const verticalDistance = Math.max(1, targetBrick.mesh.position.y - targetY);
+                        const desiredImpact = THREE.MathUtils.clamp((targetBrick.mesh.position.x - targetX) * 5 / (verticalDistance * 7.1), -.72, .72);
+                        targetX -= desiredImpact * 1.12;
+                    }
+                }
+                paddle.position.x += (targetX - paddle.position.x) * Math.min(1, delta * 9);
+            } else if (pointerX !== null) paddle.position.x += (pointerX - paddle.position.x) * Math.min(1, delta * 18);
+            else {
+                const direction = Number(keys.has('ArrowRight') || keys.has('d')) - Number(keys.has('ArrowLeft') || keys.has('a'));
+                paddle.position.x += direction * 8.6 * delta;
+            }
+            paddle.position.x = THREE.MathUtils.clamp(paddle.position.x, -6.72, 6.72);
+            ball.position.x += ballVelocity.x * delta;
+            ball.position.y += ballVelocity.y * delta;
+
+            if (ball.position.x < -7.75 || ball.position.x > 7.75) {
+                ball.position.x = THREE.MathUtils.clamp(ball.position.x, -7.75, 7.75);
+                ballVelocity.x *= -1;
+                tone(300, .06, 'sine', .025, 420);
+            }
+            if (ball.position.y > 4.25) {
+                ball.position.y = 4.25;
+                ballVelocity.y = -Math.abs(ballVelocity.y);
+                tone(320, .06, 'sine', .025, 440);
+            }
+
+            if (ballVelocity.y < 0 && ball.position.y - .16 < paddle.position.y + .12 && ball.position.y > paddle.position.y - .24 && Math.abs(ball.position.x - paddle.position.x) < 1.31) {
+                const impact = THREE.MathUtils.clamp((ball.position.x - paddle.position.x) / 1.12, -1, 1);
+                ball.position.y = paddle.position.y + .29;
+                ballVelocity.set(impact * 7.1, Math.sqrt(Math.max(25, ballVelocity.lengthSq() - impact * impact * 50)));
+                tone(460, .1, 'triangle', .04, 720);
+            }
+
+            for (let i = bricks.length - 1; i >= 0; i--) {
+                const brick = bricks[i];
+                const dx = ball.position.x - brick.mesh.position.x;
+                const dy = ball.position.y - brick.mesh.position.y;
+                if (!hitBrick(brick, dx, dy)) continue;
+                burst(brick.mesh.position, brick.color);
+                brick.mesh.geometry.dispose();
+                brick.mesh.material.forEach(material => material.dispose());
+                scene.remove(brick.mesh);
+                bricks.splice(i, 1);
+                score += 10;
+                updateHud();
+                tone(380 + (i % 5) * 90, .1, 'sine', .04, 700 + (i % 5) * 100);
+                break;
+            }
+
+            if (ball.position.y < -4.24) {
+                lives--;
+                updateHud();
+                tone(200, .34, 'sawtooth', .04, 65);
+                if (lives <= 0) {
+                    running = false;
+                    showOverlay('GAME OVER', '再來一局？', `最後得分 ${String(score).padStart(4, '0')}<br>彩虹磚塊還在等你。`, '重新開始');
+                } else resetBall();
+            }
+
+            if (bricks.length === 0 && running) {
+                level++;
+                updateHud();
+                makeBricks();
+                resetBall();
+                tone(480, .35, 'triangle', .05, 960);
+            }
+        }
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const delta = Math.min((now - lastFrame) / 1000, .03);
+            lastFrame = now;
+            update(delta);
+            stars.rotation.z += delta * .008;
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.mesh.position.addScaledVector(particle.velocity, delta);
+                particle.life -= delta;
+                particle.mesh.material.opacity = Math.max(0, particle.life * 2);
+                if (particle.life <= 0) {
+                    scene.remove(particle.mesh);
+                    particle.mesh.geometry.dispose();
+                    particle.mesh.material.dispose();
+                    particles.splice(i, 1);
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        requestAnimationFrame(animate);
+
+        const pointer = new THREE.Vector2();
+        const pointerRay = new THREE.Raycaster();
+        const paddlePlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -paddle.position.z);
+
+        function positionFromPointer(event) {
+            const bounds = renderer.domElement.getBoundingClientRect();
+            pointer.set((event.clientX - bounds.left) / bounds.width * 2 - 1, -((event.clientY - bounds.top) / bounds.height * 2 - 1));
+            pointerRay.setFromCamera(pointer, camera);
+            const intersection = pointerRay.ray.intersectPlane(paddlePlane, new THREE.Vector3());
+            if (intersection) pointerX = THREE.MathUtils.clamp(intersection.x, -6.72, 6.72);
+        }
+        stage.addEventListener('pointermove', positionFromPointer);
+        stage.addEventListener('pointerleave', () => { pointerX = null; });
+        stage.addEventListener('pointerdown', event => {
+            if (event.target.closest('#overlay')) return;
+            stage.setPointerCapture(event.pointerId);
+            positionFromPointer(event);
+        });
+        stage.addEventListener('pointerup', () => { pointerX = null; });
+        window.addEventListener('keydown', event => {
+            if (['ArrowLeft', 'ArrowRight', ' '].includes(event.key)) event.preventDefault();
+            keys.add(event.key);
+            if (event.code === 'Space' && running) {
+                paused = !paused;
+                if (paused) showOverlay('PAUSED', '休息一下', '按空白鍵繼續。', '繼續遊戲');
+                else overlay.hidden = true;
+            }
+        });
+        window.addEventListener('keyup', event => keys.delete(event.key));
+        playButton.addEventListener('click', () => {
+            if (running && paused) {
+                paused = false;
+                overlay.hidden = true;
+            } else startGame();
+        });
+        soundButton.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundButton.setAttribute('aria-label', soundEnabled ? '關閉音效' : '開啟音效');
+            soundIcon.innerHTML = soundEnabled
+                ? '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>'
+                : '<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6m0-6-5 6"/>';
+        });
+            autoToggle.addEventListener('change', () => {
+                autoControl = autoToggle.checked;
+                pointerX = null;
+            });
+    </script>
+</body>
+</html>

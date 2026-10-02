@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星際防衛戰</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: grid; place-items: center; overflow: hidden; color: #eaf6ff; background: #050816; font-family: system-ui, "Microsoft JhengHei", sans-serif; }
+        .game { width: min(94vw, 720px); text-align: center; }
+        h1 { margin: 0 0 10px; color: #7cecff; letter-spacing: .18em; text-shadow: 0 0 18px #11bde8; }
+        .hud { display: flex; justify-content: space-between; margin: 0 4px 8px; color: #b8d6f4; font-size: 14px; }
+        .screen { position: relative; border: 1px solid #245276; border-radius: 12px; overflow: hidden; box-shadow: 0 0 35px #0876a533; background: #070d22; }
+        canvas { display: block; width: 100%; height: auto; }
+        .overlay { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; padding: 20px; background: #050816bb; }
+        .overlay.hidden { display: none; }
+        .overlay h2 { margin: 0; font-size: clamp(24px, 6vw, 38px); color: #7cecff; }
+        .overlay p { margin: 0; line-height: 1.7; }
+        button { justify-self: center; border: 0; border-radius: 999px; padding: 11px 25px; color: #04101c; background: #7cecff; font-weight: 800; font-size: 16px; cursor: pointer; }
+        button:hover { background: white; }
+        .help { margin: 9px 0 0; color: #8da8c4; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <main class="game">
+        <h1>星際防衛戰</h1>
+        <div class="hud"><span>分數：<b id="score">0</b></span><span>生命：<b id="lives">3</b></span><span>最高：<b id="best">0</b></span></div>
+        <div class="screen">
+            <canvas id="game" width="720" height="480" aria-label="太空射擊遊戲"></canvas>
+            <div class="overlay" id="overlay">
+                <h2 id="message">準備出擊</h2>
+                <p id="description">擊落敵機，守住星際防線！<br>使用 ← → 或 A / D 移動，空白鍵射擊</p>
+                <button id="start">開始遊戲</button>
+            </div>
+        </div>
+        <p class="help">也可用滑鼠或手指拖曳飛船｜音效會在開始遊戲後啟用</p>
+    </main>
+    <script>
+        (() => {
+            const canvas = document.getElementById('game');
+            const ctx = canvas.getContext('2d');
+            const overlay = document.getElementById('overlay');
+            const startButton = document.getElementById('start');
+            const scoreLabel = document.getElementById('score');
+            const livesLabel = document.getElementById('lives');
+            const bestLabel = document.getElementById('best');
+            const W = canvas.width, H = canvas.height;
+            let audio, running = false, score = 0, lives = 3, lastShot = 0, lastSpawn = 0, lastTime = 0;
+            let player, bullets = [], enemies = [], particles = [], keys = {}, stars = [];
+            let best = Number(localStorage.getItem('spaceShooterBest') || 0);
+            bestLabel.textContent = best;
+            for (let i = 0; i < 90; i++) stars.push({ x: Math.random() * W, y: Math.random() * H, size: Math.random() * 2 + .4, speed: Math.random() * 45 + 15 });
+
+            function tone(frequency, duration, type = 'sine', volume = .035, endFrequency = frequency) {
+                if (!audio) return;
+                const now = audio.currentTime;
+                const oscillator = audio.createOscillator(), gain = audio.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(frequency, now);
+                oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), now + duration);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(.001, now + duration);
+                oscillator.connect(gain).connect(audio.destination);
+                oscillator.start(now);
+                oscillator.stop(now + duration);
+            }
+            function reset() {
+                score = 0; lives = 3; bullets = []; enemies = []; particles = [];
+                player = { x: W / 2, y: H - 55, width: 34, height: 34, invulnerable: 0 };
+                scoreLabel.textContent = score; livesLabel.textContent = lives;
+            }
+            function start() {
+                audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+                if (audio.state === 'suspended') audio.resume();
+                reset(); running = true; lastTime = performance.now(); lastSpawn = lastTime;
+                overlay.classList.add('hidden'); requestAnimationFrame(loop);
+            }
+            function shoot(now) {
+                if (now - lastShot < 220) return;
+                lastShot = now;
+                bullets.push({ x: player.x, y: player.y - 19, speed: 430 });
+                tone(720, .09, 'triangle', .025, 360);
+            }
+            function spawnEnemy() {
+                const size = 25 + Math.random() * 13;
+                enemies.push({ x: size + Math.random() * (W - size * 2), y: -size, size, speed: 75 + Math.random() * 65 + Math.min(score, 500) * .12, drift: (Math.random() - .5) * 55 });
+            }
+            function burst(x, y, color) {
+                for (let i = 0; i < 12; i++) particles.push({ x, y, vx: (Math.random() - .5) * 220, vy: (Math.random() - .5) * 220, life: .45 + Math.random() * .35, color });
+            }
+            function endGame() {
+                running = false;
+                if (score > best) { best = score; localStorage.setItem('spaceShooterBest', best); bestLabel.textContent = best; }
+                document.getElementById('message').textContent = '任務結束';
+                document.getElementById('description').innerHTML = `本次分數：${score}<br>再試一次，打破最高紀錄！`;
+                startButton.textContent = '重新開始'; overlay.classList.remove('hidden');
+                tone(240, .45, 'sawtooth', .045, 65);
+            }
+            function drawShip(x, y, color = '#70eaff') {
+                ctx.save(); ctx.translate(x, y);
+                ctx.fillStyle = '#ffb84d'; ctx.beginPath(); ctx.moveTo(-7, 12); ctx.lineTo(0, 28 + Math.random() * 7); ctx.lineTo(7, 12); ctx.fill();
+                ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(17, 15); ctx.lineTo(0, 9); ctx.lineTo(-17, 15); ctx.closePath(); ctx.fill();
+                ctx.fillStyle = '#d8fbff'; ctx.beginPath(); ctx.ellipse(0, 0, 5, 9, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+            function loop(now) {
+                if (!running) return;
+                const dt = Math.min((now - lastTime) / 1000, .035); lastTime = now;
+                ctx.clearRect(0, 0, W, H);
+                const background = ctx.createLinearGradient(0, 0, 0, H); background.addColorStop(0, '#080e26'); background.addColorStop(1, '#101b35'); ctx.fillStyle = background; ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = '#c7e9ff';
+                stars.forEach(star => { star.y += star.speed * dt; if (star.y > H) { star.y = 0; star.x = Math.random() * W; } ctx.globalAlpha = .35 + star.size / 3; ctx.fillRect(star.x, star.y, star.size, star.size); }); ctx.globalAlpha = 1;
+                const direction = (keys.ArrowRight || keys.d || keys.D ? 1 : 0) - (keys.ArrowLeft || keys.a || keys.A ? 1 : 0);
+                player.x = Math.max(20, Math.min(W - 20, player.x + direction * 330 * dt));
+                if (keys[' '] || keys.ArrowUp || keys.w || keys.W) shoot(now);
+                if (now - lastSpawn > Math.max(360, 1050 - score * 2)) { spawnEnemy(); lastSpawn = now; }
+                bullets = bullets.filter(b => b.y > -10); bullets.forEach(b => { b.y -= b.speed * dt; ctx.fillStyle = '#8df6ff'; ctx.shadowColor = '#43eaff'; ctx.shadowBlur = 12; ctx.fillRect(b.x - 2, b.y - 9, 4, 14); }); ctx.shadowBlur = 0;
+                enemies.forEach((e, ei) => {
+                    e.y += e.speed * dt; e.x += e.drift * dt;
+                    ctx.fillStyle = '#ff5f79'; ctx.shadowColor = '#ff315e'; ctx.shadowBlur = 12;
+                    ctx.beginPath(); ctx.moveTo(e.x, e.y - e.size * .65); ctx.lineTo(e.x + e.size * .75, e.y - e.size * .1); ctx.lineTo(e.x + e.size * .5, e.y + e.size * .55); ctx.lineTo(e.x, e.y + e.size * .3); ctx.lineTo(e.x - e.size * .5, e.y + e.size * .55); ctx.lineTo(e.x - e.size * .75, e.y - e.size * .1); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+                    for (let bi = bullets.length - 1; bi >= 0; bi--) if (Math.hypot(e.x - bullets[bi].x, e.y - bullets[bi].y) < e.size * .8) { bullets.splice(bi, 1); enemies.splice(ei, 1); burst(e.x, e.y, '#ff7890'); score += 10; scoreLabel.textContent = score; tone(180, .16, 'square', .04, 520); break; }
+                    if (e.y > H + e.size) { enemies.splice(ei, 1); lives--; livesLabel.textContent = lives; burst(e.x, H - 10, '#ff516e'); if (lives <= 0) endGame(); }
+                    else if (player.invulnerable <= 0 && Math.hypot(e.x - player.x, e.y - player.y) < e.size * .72 + 13) { enemies.splice(ei, 1); burst(e.x, e.y, '#ff7890'); lives--; livesLabel.textContent = lives; player.invulnerable = 1.2; tone(130, .3, 'sawtooth', .05, 55); if (lives <= 0) endGame(); }
+                });
+                particles = particles.filter(p => p.life > 0); particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 3, 3); }); ctx.globalAlpha = 1;
+                player.invulnerable = Math.max(0, player.invulnerable - dt);
+                if (player.invulnerable === 0 || Math.floor(now / 100) % 2 === 0) drawShip(player.x, player.y);
+                if (running) requestAnimationFrame(loop);
+            }
+            startButton.addEventListener('click', start);
+            window.addEventListener('keydown', event => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' '].includes(event.key)) event.preventDefault(); keys[event.key] = true; });
+            window.addEventListener('keyup', event => { keys[event.key] = false; });
+            let dragging = false;
+            function moveToPointer(event) { const rect = canvas.getBoundingClientRect(); if (running && player) player.x = Math.max(20, Math.min(W - 20, (event.clientX - rect.left) * W / rect.width)); }
+            canvas.addEventListener('pointerdown', event => { dragging = true; canvas.setPointerCapture(event.pointerId); moveToPointer(event); });
+            canvas.addEventListener('pointermove', event => { if (dragging) moveToPointer(event); });
+            canvas.addEventListener('pointerup', () => dragging = false);
+        })();
+    </script>
+</body>
+</html>
